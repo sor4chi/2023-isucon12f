@@ -48,7 +48,7 @@ const (
 
 	SQLDirectory string = "../sql/"
 
-	IncrementalIdGenerateFrom int64 = 10000000
+	IncrementalIdGenerateFrom int64 = 1000000000
 )
 
 type Handler struct {
