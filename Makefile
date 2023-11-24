@@ -31,6 +31,7 @@ rotate-all: rotate-access-log rotate-slow-log
 rotate-access-log:
 	echo "Rotating access log"
 	if [ ! -d etc/$(SERVER)/nginx ]; then echo "nginx not configured"; exit 1; fi
+	if [ ! -f $(NGINX_ACCESS_LOG) ]; then echo "access log not found"; exit 1; fi
 	sudo mv $(NGINX_ACCESS_LOG) $(NGINX_ACCESS_LOG).$(shell date +%Y%m%d)
 	sudo systemctl restart nginx
 
@@ -38,6 +39,7 @@ rotate-access-log:
 rotate-slow-log:
 	echo "Rotating slow log"
 	if [ ! -d etc/$(SERVER)/mysql ]; then echo "mysql not configured"; exit 1; fi
+	if [ ! -f $(MYSQL_SLOW_LOG) ]; then echo "slow log not found"; exit 1; fi
 	sudo mv $(MYSQL_SLOW_LOG) $(MYSQL_SLOW_LOG).$(shell date +%Y%m%d)
 	sudo systemctl restart mysql
 
