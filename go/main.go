@@ -733,60 +733,41 @@ type ObtainItemResult struct {
 
 func (h *Handler) obtainItemBulk(tx *sqlx.Tx, args []*ObtainItemArgs) ([]*ObtainItemResult, error) {
 	results := make([]*ObtainItemResult, 0, len(args))
-	resultMutex := sync.Mutex{}
-
-	var aerr error
-	wg := sync.WaitGroup{}
 
 	for _, arg := range args {
-		wg.Add(1)
-		go func(arg *ObtainItemArgs) {
-			defer wg.Done()
-			obtainCoins := make([]int64, 0)
-			obtainCards := make([]*UserCard, 0)
-			obtainItems := make([]*UserItem, 0)
+		obtainCoins := make([]int64, 0)
+		obtainCards := make([]*UserCard, 0)
+		obtainItems := make([]*UserItem, 0)
 
-			switch arg.ItemType {
-			case 1: // coin
-				obtainCoins = h.updateObtainCoins(tx, arg.UserID, arg.ObtainAmount, arg.RequestAt)
+		switch arg.ItemType {
+		case 1: // coin
+			obtainCoins = h.updateObtainCoins(tx, arg.UserID, arg.ObtainAmount, arg.RequestAt)
 
-			case 2: // card(ハンマー)
-				cards, err := h.updateObtainCards(tx, arg.UserID, arg.ItemID, arg.ItemType, arg.RequestAt)
-				if err != nil {
-					aerr = err
-					return
-				}
-				obtainCards = append(obtainCards, cards...)
-
-			case 3, 4: // 強化素材
-				items, err := h.updateObtainItems(tx, arg.UserID, arg.ItemID, arg.ItemType, arg.ObtainAmount, arg.RequestAt)
-				if err != nil {
-					aerr = err
-					return
-				}
-				obtainItems = append(obtainItems, items...)
-
-			default:
-				aerr = ErrInvalidItemType
-				return
-
+		case 2: // card(ハンマー)
+			cards, err := h.updateObtainCards(tx, arg.UserID, arg.ItemID, arg.ItemType, arg.RequestAt)
+			if err != nil {
+				return nil, err
 			}
+			obtainCards = append(obtainCards, cards...)
 
-			resultMutex.Lock()
-			results = append(results, &ObtainItemResult{
-				UserID:      arg.UserID,
-				ObtainCoins: obtainCoins,
-				ObtainCards: obtainCards,
-				ObtainItems: obtainItems,
-			})
-			resultMutex.Unlock()
-		}(arg)
-	}
+		case 3, 4: // 強化素材
+			items, err := h.updateObtainItems(tx, arg.UserID, arg.ItemID, arg.ItemType, arg.ObtainAmount, arg.RequestAt)
+			if err != nil {
+				return nil, err
+			}
+			obtainItems = append(obtainItems, items...)
 
-	wg.Wait()
+		default:
+			return nil, ErrInvalidItemType
 
-	if aerr != nil {
-		return nil, aerr
+		}
+
+		results = append(results, &ObtainItemResult{
+			UserID:      arg.UserID,
+			ObtainCoins: obtainCoins,
+			ObtainCards: obtainCards,
+			ObtainItems: obtainItems,
+		})
 	}
 
 	return results, nil
