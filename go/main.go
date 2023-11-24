@@ -547,7 +547,7 @@ func (h *Handler) updateObtainCoins(tx *sqlx.Tx, userID int64, amount int64, req
 	return obtainCoins
 }
 
-func (h *Handler) updateObtainCard(tx *sqlx.Tx, userID int64, itemID int64, itemType int, requestAt int64) ([]*UserCard, error) {
+func (h *Handler) updateObtainCards(tx *sqlx.Tx, userID int64, itemID int64, itemType int, requestAt int64) ([]*UserCard, error) {
 	obtainCards := make([]*UserCard, 0)
 
 	query := "SELECT * FROM item_masters WHERE id=? AND item_type=?"
@@ -582,7 +582,7 @@ func (h *Handler) updateObtainCard(tx *sqlx.Tx, userID int64, itemID int64, item
 	return obtainCards, nil
 }
 
-func (h *Handler) updateObtainItem(tx *sqlx.Tx, userID int64, itemID int64, itemType int, amount int64, requestAt int64) ([]*UserItem, error) {
+func (h *Handler) updateObtainItems(tx *sqlx.Tx, userID int64, itemID int64, itemType int, amount int64, requestAt int64) ([]*UserItem, error) {
 	obtainItems := make([]*UserItem, 0)
 
 	query := "SELECT * FROM item_masters WHERE id=? AND item_type=?"
@@ -647,14 +647,14 @@ func (h *Handler) obtainItem(tx *sqlx.Tx, userID, itemID int64, itemType int, ob
 		obtainCoins = h.updateObtainCoins(tx, userID, obtainAmount, requestAt)
 
 	case 2: // card(ハンマー)
-		cards, err := h.updateObtainCard(tx, userID, itemID, itemType, requestAt)
+		cards, err := h.updateObtainCards(tx, userID, itemID, itemType, requestAt)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		obtainCards = append(obtainCards, cards...)
 
 	case 3, 4: // 強化素材
-		items, err := h.updateObtainItem(tx, userID, itemID, itemType, obtainAmount, requestAt)
+		items, err := h.updateObtainItems(tx, userID, itemID, itemType, obtainAmount, requestAt)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -665,6 +665,63 @@ func (h *Handler) obtainItem(tx *sqlx.Tx, userID, itemID int64, itemType int, ob
 	}
 
 	return obtainCoins, obtainCards, obtainItems, nil
+}
+
+type ObtainItemArgs struct {
+	UserID       int64
+	ItemID       int64
+	ItemType     int
+	ObtainAmount int64
+	RequestAt    int64
+}
+
+type ObtainItemResult struct {
+	UserID      int64
+	ObtainCoins []int64
+	ObtainCards []*UserCard
+	ObtainItems []*UserItem
+}
+
+func (h *Handler) obtainItemBulk(tx *sqlx.Tx, args []*ObtainItemArgs) ([]*ObtainItemResult, error) {
+	results := make([]*ObtainItemResult, 0, len(args))
+
+	for _, arg := range args {
+		obtainCoins := make([]int64, 0)
+		obtainCards := make([]*UserCard, 0)
+		obtainItems := make([]*UserItem, 0)
+
+		switch arg.ItemType {
+		case 1: // coin
+			obtainCoins = h.updateObtainCoins(tx, arg.UserID, arg.ObtainAmount, arg.RequestAt)
+
+		case 2: // card(ハンマー)
+			cards, err := h.updateObtainCards(tx, arg.UserID, arg.ItemID, arg.ItemType, arg.RequestAt)
+			if err != nil {
+				return nil, err
+			}
+			obtainCards = append(obtainCards, cards...)
+
+		case 3, 4: // 強化素材
+			items, err := h.updateObtainItems(tx, arg.UserID, arg.ItemID, arg.ItemType, arg.ObtainAmount, arg.RequestAt)
+			if err != nil {
+				return nil, err
+			}
+			obtainItems = append(obtainItems, items...)
+
+		default:
+			return nil, ErrInvalidItemType
+
+		}
+
+		results = append(results, &ObtainItemResult{
+			UserID:      arg.UserID,
+			ObtainCoins: obtainCoins,
+			ObtainCards: obtainCards,
+			ObtainItems: obtainItems,
+		})
+	}
+
+	return results, nil
 }
 
 // initialize 初期化処理
@@ -1379,17 +1436,28 @@ func (h *Handler) receivePresent(c echo.Context) error {
 	for i := range obtainPresent {
 		obtainPresent[i].UpdatedAt = requestAt
 		obtainPresent[i].DeletedAt = &requestAt
-		v := obtainPresent[i]
-		_, _, _, err = h.obtainItem(tx, v.UserID, v.ItemID, v.ItemType, int64(v.Amount), requestAt)
-		if err != nil {
-			if err == ErrUserNotFound || err == ErrItemNotFound {
-				return errorResponse(c, http.StatusNotFound, err)
-			}
-			if err == ErrInvalidItemType {
-				return errorResponse(c, http.StatusBadRequest, err)
-			}
-			return errorResponse(c, http.StatusInternalServerError, err)
+	}
+
+	obtainItemBulkArgs := make([]*ObtainItemArgs, 0, len(obtainPresent))
+	for _, v := range obtainPresent {
+		obtainItemBulkArgs = append(obtainItemBulkArgs, &ObtainItemArgs{
+			UserID:       v.UserID,
+			ItemID:       v.ItemID,
+			ItemType:     v.ItemType,
+			ObtainAmount: int64(v.Amount),
+			RequestAt:    requestAt,
+		})
+	}
+
+	_, err = h.obtainItemBulk(tx, obtainItemBulkArgs)
+	if err != nil {
+		if err == ErrUserNotFound || err == ErrItemNotFound {
+			return errorResponse(c, http.StatusNotFound, err)
 		}
+		if err == ErrInvalidItemType {
+			return errorResponse(c, http.StatusBadRequest, err)
+		}
+		return errorResponse(c, http.StatusInternalServerError, err)
 	}
 
 	err = tx.Commit()
