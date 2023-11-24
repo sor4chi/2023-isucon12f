@@ -97,6 +97,15 @@ func main() {
 	}
 	defer dbx4.Close()
 
+	dbx1.SetMaxOpenConns(500)
+	dbx1.SetConnMaxLifetime(10 * time.Minute)
+	dbx2.SetMaxOpenConns(500)
+	dbx2.SetConnMaxLifetime(10 * time.Minute)
+	dbx3.SetMaxOpenConns(500)
+	dbx3.SetConnMaxLifetime(10 * time.Minute)
+	dbx4.SetMaxOpenConns(500)
+	dbx4.SetConnMaxLifetime(10 * time.Minute)
+
 	e.Server.Addr = fmt.Sprintf(":%v", "8080")
 	h := &Handler{
 		DB1: dbx1,
