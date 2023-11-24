@@ -536,7 +536,7 @@ func (h *Handler) obtainPresent(tx *sqlx.Tx, userID int64, requestAt int64) ([]*
 	go func() {
 		defer wg.Done()
 		if len(insertUPs) > 0 {
-			_, err := tx.NamedExec("INSERT INTO user_presents(id, user_id, sent_at, item_type, item_id, amount, present_message, created_at, updated_at) VALUES (:id, :user_id, :sent_at, :item_type, :item_id, :amount, :present_message, :created_at, :updated_at)", insertUPs)
+			_, err := h.getDBByUserId(userID).NamedExec("INSERT INTO user_presents(id, user_id, sent_at, item_type, item_id, amount, present_message, created_at, updated_at) VALUES (:id, :user_id, :sent_at, :item_type, :item_id, :amount, :present_message, :created_at, :updated_at)", insertUPs)
 			if err != nil {
 				syncErr = err
 				return
@@ -1335,7 +1335,7 @@ func (h *Handler) drawGacha(c echo.Context) error {
 			UpdatedAt:      requestAt,
 		}
 		query = "INSERT INTO user_presents(id, user_id, sent_at, item_type, item_id, amount, present_message, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-		if _, err := tx.Exec(query, present.ID, present.UserID, present.SentAt, present.ItemType, present.ItemID, present.Amount, present.PresentMessage, present.CreatedAt, present.UpdatedAt); err != nil {
+		if _, err := h.getDBByUserId(userID).Exec(query, present.ID, present.UserID, present.SentAt, present.ItemType, present.ItemID, present.Amount, present.PresentMessage, present.CreatedAt, present.UpdatedAt); err != nil {
 			return errorResponse(c, http.StatusInternalServerError, err)
 		}
 
@@ -1390,12 +1390,12 @@ func (h *Handler) listPresent(c echo.Context) error {
 	WHERE user_id = ? AND deleted_at IS NULL
 	ORDER BY created_at DESC, id
 	LIMIT ? OFFSET ?`
-	if err = h.DB1.Select(&presentList, query, userID, PresentCountPerPage, offset); err != nil {
+	if err = h.getDBByUserId(userID).Select(&presentList, query, userID, PresentCountPerPage, offset); err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
 
 	var presentCount int
-	if err = h.DB1.Get(&presentCount, "SELECT COUNT(*) FROM user_presents WHERE user_id = ? AND deleted_at IS NULL", userID); err != nil {
+	if err = h.getDBByUserId(userID).Get(&presentCount, "SELECT COUNT(*) FROM user_presents WHERE user_id = ? AND deleted_at IS NULL", userID); err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
 
@@ -1452,7 +1452,7 @@ func (h *Handler) receivePresent(c echo.Context) error {
 		return errorResponse(c, http.StatusBadRequest, err)
 	}
 	obtainPresent := []*UserPresent{}
-	if err = h.DB1.Select(&obtainPresent, query, params...); err != nil {
+	if err = h.getDBByUserId(userID).Select(&obtainPresent, query, params...); err != nil {
 		return errorResponse(c, http.StatusBadRequest, err)
 	}
 
@@ -1467,6 +1467,11 @@ func (h *Handler) receivePresent(c echo.Context) error {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
 	defer tx.Rollback() //nolint:errcheck
+	tx2, err := h.getDBByUserId(userID).Beginx()
+	if err != nil {
+		return errorResponse(c, http.StatusInternalServerError, err)
+	}
+	defer tx2.Rollback() //nolint:errcheck
 
 	notDeletedPresentIDs := []int64{}
 	for _, v := range obtainPresent {
@@ -1481,7 +1486,7 @@ func (h *Handler) receivePresent(c echo.Context) error {
 	if err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
-	if _, err = tx.Exec(query, params...); err != nil {
+	if _, err = tx2.Exec(query, params...); err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
 
@@ -1514,6 +1519,10 @@ func (h *Handler) receivePresent(c echo.Context) error {
 	}
 
 	err = tx.Commit()
+	if err != nil {
+		return errorResponse(c, http.StatusInternalServerError, err)
+	}
+	err = tx2.Commit()
 	if err != nil {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
