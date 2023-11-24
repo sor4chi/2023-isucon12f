@@ -1326,21 +1326,28 @@ func (h *Handler) receivePresent(c echo.Context) error {
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	// 配布処理
-	for i := range obtainPresent {
-		if obtainPresent[i].DeletedAt != nil {
+	notDeletedPresentIDs := []int64{}
+	for _, v := range obtainPresent {
+		if v.DeletedAt != nil {
 			return errorResponse(c, http.StatusInternalServerError, fmt.Errorf("received present"))
 		}
+		notDeletedPresentIDs = append(notDeletedPresentIDs, v.ID)
+	}
 
+	query = "UPDATE user_presents SET deleted_at=?, updated_at=? WHERE id IN (?)"
+	query, params, err = sqlx.In(query, requestAt, requestAt, notDeletedPresentIDs)
+	if err != nil {
+		return errorResponse(c, http.StatusInternalServerError, err)
+	}
+	if _, err = tx.Exec(query, params...); err != nil {
+		return errorResponse(c, http.StatusInternalServerError, err)
+	}
+
+	// 配布処理
+	for i := range obtainPresent {
 		obtainPresent[i].UpdatedAt = requestAt
 		obtainPresent[i].DeletedAt = &requestAt
 		v := obtainPresent[i]
-		query = "UPDATE user_presents SET deleted_at=?, updated_at=? WHERE id=?"
-		_, err := tx.Exec(query, requestAt, requestAt, v.ID)
-		if err != nil {
-			return errorResponse(c, http.StatusInternalServerError, err)
-		}
-
 		_, _, _, err = h.obtainItem(tx, v.UserID, v.ItemID, v.ItemType, int64(v.Amount), requestAt)
 		if err != nil {
 			if err == ErrUserNotFound || err == ErrItemNotFound {
