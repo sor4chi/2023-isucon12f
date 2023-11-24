@@ -1337,7 +1337,10 @@ func (h *Handler) drawGacha(c echo.Context) error {
 	defer tx.Rollback() //nolint:errcheck
 
 	// プレゼントにガチャ結果を付与する
+
+	// bulk insert
 	presents := make([]*UserPresent, 0, gachaCount)
+	insertPresents := make([]*UserPresent, 0, gachaCount)
 	for _, v := range result {
 		pID, err := h.generateID()
 		if err != nil {
@@ -1354,12 +1357,17 @@ func (h *Handler) drawGacha(c echo.Context) error {
 			CreatedAt:      requestAt,
 			UpdatedAt:      requestAt,
 		}
-		query = "INSERT INTO user_presents(id, user_id, sent_at, item_type, item_id, amount, present_message, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-		if _, err := h.getDBByUserId(userID).Exec(query, present.ID, present.UserID, present.SentAt, present.ItemType, present.ItemID, present.Amount, present.PresentMessage, present.CreatedAt, present.UpdatedAt); err != nil {
-			return errorResponse(c, http.StatusInternalServerError, err)
-		}
+		insertPresents = append(insertPresents, present)
+	}
 
-		presents = append(presents, present)
+	query = "INSERT INTO user_presents(id, user_id, sent_at, item_type, item_id, amount, present_message, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	query, args, err := sqlx.In(query, insertPresents)
+	if err != nil {
+		return errorResponse(c, http.StatusInternalServerError, err)
+	}
+	query = h.getDBByUserId(userID).Rebind(query)
+	if _, err := h.getDBByUserId(userID).Exec(query, args...); err != nil {
+		return errorResponse(c, http.StatusInternalServerError, err)
 	}
 
 	query = "UPDATE users SET isu_coin=? WHERE id=?"
