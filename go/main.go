@@ -634,6 +634,11 @@ func initialize(c echo.Context) error {
 		return errorResponse(c, http.StatusInternalServerError, err)
 	}
 
+	_, err = dbx.Exec("ALTER TABLE user_presents ADD INDEX idx_user_presents_user_id (user_id, deleted_at, created_at DESC, id)")
+	if err != nil {
+		log.Printf("[INFO] Already added index idx_user_presents_user_id", err)
+	}
+
 	return successResponse(c, &InitializeResponse{
 		Language: "go",
 	})
