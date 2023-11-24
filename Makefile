@@ -1,6 +1,6 @@
 all: rotate-all app-deploy
 
-include: .env
+include .env
 
 ifeq ($(SERVER),)
     $(error SERVER env is not set)
@@ -69,13 +69,13 @@ dump-all: dump-nginx dump-mysql
 dump-nginx:
 	echo "dump nginx conf"
 	mkdir -p ./etc/$(SERVER)
-	sudo cp -r $(NGINX_CONF) ./etc/$(SERVER)
+	cp -r $(NGINX_CONF) ./etc/$(SERVER)
 
 .PHONY: dump-mysql
 dump-mysql:
 	echo "dump nginx conf"
 	mkdir -p ./etc/$(SERVER)
-	sudo cp -r $(MYSQL_CONF) ./etc/$(SERVER)
+	cp -r $(MYSQL_CONF) ./etc/$(SERVER)
 
 
 
@@ -104,7 +104,7 @@ mysql-conf-deploy:
 .PHONY: app-deploy
 app-deploy:
 	echo "app deploy"
-	cd $(APP) && go build -o $(APP_BINARY)
+	cd $(APP) && go build *.go -o $(APP_BINARY)
 	sudo systemctl restart $(SERVICE)
 
 
