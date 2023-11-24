@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bwmarrin/snowflake"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -47,8 +48,6 @@ const (
 	PresentCountPerPage int = 100
 
 	SQLDirectory string = "../sql/"
-
-	IncrementalIdGenerateFrom int64 = 1000000000
 )
 
 type Handler struct {
@@ -1896,13 +1895,26 @@ func (g *IDGenerator) Generate() int64 {
 	return g.ID
 }
 
-var generator = &IDGenerator{
-	ID: IncrementalIdGenerateFrom,
+var (
+	node *snowflake.Node
+)
+
+func init() {
+	serverIdStr := os.Getenv("SERVER_ID") // "s1"
+	if serverIdStr == "" {
+		serverIdStr = "s1"
+	}
+	id, _ := strconv.ParseInt(serverIdStr[1:], 10, 64)
+	var err error
+	node, err = snowflake.NewNode(id)
+	if err != nil {
+		panic(err)
+	}
 }
 
-// generateID ユニークなIDを生成する
+// generateID uniqueなIDを生成する
 func (h *Handler) generateID() (int64, error) {
-	return generator.Generate(), nil
+	return node.Generate().Int64(), nil
 }
 
 // generateUUID UUIDの生成
