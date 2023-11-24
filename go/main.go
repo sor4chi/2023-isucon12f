@@ -781,6 +781,7 @@ func initialize(c echo.Context) error {
 			}
 			defer dbx.Close()
 
+			os.Setenv("ISUCON_DB_HOST", string(db))
 			out, err := exec.Command("/bin/sh", "-c", SQLDirectory+"init.sh").CombinedOutput()
 			if err != nil {
 				c.Logger().Errorf("Failed to initialize %s: %v", string(out), err)
