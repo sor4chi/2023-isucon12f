@@ -52,9 +52,9 @@ const (
 
 type Handler struct {
 	DB1 *sqlx.DB
-	// DB2 *sqlx.DB
-	// DB3 *sqlx.DB
-	// DB4 *sqlx.DB
+	DB2 *sqlx.DB
+	DB3 *sqlx.DB
+	DB4 *sqlx.DB
 }
 
 func main() {
@@ -100,9 +100,9 @@ func main() {
 	e.Server.Addr = fmt.Sprintf(":%v", "8080")
 	h := &Handler{
 		DB1: dbx1,
-		// DB2: dbx2,
-		// DB3: dbx3,
-		// DB4: dbx4,
+		DB2: dbx2,
+		DB3: dbx3,
+		DB4: dbx4,
 	}
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{}))
@@ -169,14 +169,13 @@ func connectDB(batch bool, db DB) (*sqlx.DB, error) {
 }
 
 func (h *Handler) getDBByUserId(userID int64) *sqlx.DB {
-	// if userID%3 == 0 {
-	// 	return h.DB2
-	// } else if userID%3 == 1 {
-	// 	return h.DB3
-	// } else {
-	// 	return h.DB4
-	// }
-	return h.DB1
+	if userID%3 == 0 {
+		return h.DB2
+	} else if userID%3 == 1 {
+		return h.DB3
+	} else {
+		return h.DB4
+	}
 }
 
 // adminMiddleware 管理者ツール向けのmiddleware
