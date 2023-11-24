@@ -1,5 +1,15 @@
 matching_groups:
-  - /hoge
+  - /user/[^/]+/gacha/index
+  - /user/[^/]+/gacha/draw/[^/]+/[^/]+
+  - /user/[^/]+/present/index/[^/]+
+  - /user/[^/]+/present/receive
+  - /user/[^/]+/item
+  - /user/[^/]+/card/addexp/[^/]+
+  - /user/[^/]+/card
+  - /user/[^/]+/reward
+  - /user/[^/]+/home
+  - /admin/user/[^/]+/ban
+  - /admin/user/[^/]+
 sort: avg
 reverse: true
 metrics:
