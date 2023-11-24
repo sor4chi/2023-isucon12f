@@ -1,0 +1,13 @@
+*/**/2_init.sql
+*/**/4_alldata_exclude_user_presents.sql
+*/**/5_user_presents_not_receive_data.tsv
+*.pprof
+.env
+
+admin/
+frontend/
+node/
+perl/
+php/
+ruby/
+rust/
